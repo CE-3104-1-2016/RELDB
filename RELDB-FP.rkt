@@ -58,7 +58,6 @@
     )
   )
 
-
 ;Method that checks if a reference exist
 (define (refExist? references table column sourceTable)
   (cond
@@ -115,7 +114,6 @@
     [#t #f]
     ))
 
-
 ;Method that checks if the column exist
 (define (columnExist? DB tableName columnName level)
   (cond
@@ -140,25 +138,134 @@
          (contains? (car list) word) 
          (contains? (cdr list) word))]))
 
-;Method to test if something is an atom
-(define (atom? element)
-  (and (not (null? element))
-       (not (pair? element))))
+;Method to test if something is an atom 
+(define (atom? x)
+  (and (not (null? x))
+       (not (pair? x))))
 
-(define (listmng x) 
-  (cond
-    [(or
-      (atom? x)
-      (null? x)) x]
-    [#t ( cons
-          (listmng (car x))
-          (listmng (cdr x)))]))
-
+;Method that read the user entry
 (define (readBox)
   (regexp-split #rx" +" (read-line
-                         (current-input-port)))
+   (current-input-port)))
   )
 
+
+
+;(addReference entryList '(Mechanic Data Person))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (init DB)
+  (add_Table DB ) )
+
+
+
+
+;Method that add new tables to DB
+(define (add_Table DB userEntry)
+  (cond
+    [(not(tableExist? DB (car userEntry)))(append DB (list(cons (car userEntry) (list(cdr userEntry)))))]
+    [#t (display "Table already exist, use the command insert, to insert registers in the table")]
+    ))
+
+;Method that manage the register insertions
+(define (mngIns DB tableName data)
+  (cond
+    [(and (not(eq? data null)) (not(tableExist? DB tableName)))
+     (cond
+       [(not(reference? DB tableName))
+        (cond
+          [(list? (car data)) (insert_data_by_Parameter DB tableName data)]
+          [(atom? (car data)) (insert_data DB tableName data)]
+          [#t (display "Not valid entries")])]
+       [(reference? (car DB) tableName)
+        (cond
+          [((registerExist? DB (searchReferenced (car DB) tableName) (car data))) refExist? (car DB)])])]) 
+    [#t (display "Table doesn't exist or syntax of given records were incorrect" )]
+    )
+;Method that inserts registers by paramters
+(define(insert_data_by_Parameter DB tableName data)
+  DB)
+
+;Method that inserts data in the table, if the table exist
+(define (insert_data DB tableName data)
+  (cond
+    [(not(eq? DB null))
+     (cond
+       [(atom? (car DB))
+        (cond
+          [(eq? (car DB) tableName) (auxIns DB tableName data)]
+          [(not(eq? (car DB) tableName)) DB]
+          )]
+       [#t(cons (insert_data (car DB) tableName data) (insert_data (cdr DB) tableName data))]
+       )]
+    [#t DB])
+  ) 
+  
+;auxiliar function for insert registers
+(define (auxIns DB tableName data)
+  (display data)
+  (display (car(cdr DB)))
+  (newline)
+  (cond
+    [(eq? (length (car (cdr DB))) (length data)) (cons (car DB) (append (cdr DB) (list data)))]
+    [(> (length (car (cdr DB))) (length data)) (auxIns DB tableName (append data (list 'nil)))]
+    [(< (length (car (cdr DB))) (length data)) (display "Imposible to insert registers, more registers than necessary, please verify")]))
+
+
+;Method that check if a register is in a table
+(define (registerExist? DB tableName regName)
+  (cond
+    [(eq? DB null) #f]
+    [(eq? (caar DB) tableName) (cond
+                                [(containsReg? (caar (cddr (car DB))) regName) #t]
+                                [(registerExist? (cdr DB) tableName regName)]
+                                [#t #f])]
+    [(registerExist? (cdr DB) tableName regName)]
+    [#t #f]
+    ))
+
+;Auxiliar for search registers in a table
+(define (containsReg? pKey regName)
+  (cond
+    [(eq? pKey regName) #t]
+    [#t #f]
+   ))
+
+;Method that search the PK in the referenced table
+(define (searchReferenced references tableName)
+  (cond
+    [(atom? references) null]
+    [(null? references) null]
+    [(atom? (car references)) null (display "1")]
+    [(null? (car references)) null (display "2")]
+    [(atom? (cdr references)) null (display "3")]
+    ;[(null? (cdr references)) null (display "4")]
+    [(eq? (caaar references) tableName) (car(cdr(car references)))]
+    [#t (searchReferenced (cdr references) tableName)]
+    ))
+
+
+;(insert_data '((Insti (Nombre IdI Localizacion))(Personas(Id Nombre Apellido))) 'Insti '(TEC 123 Cartago))
+;(registerExist? '((Insti (Nombre IdI Localizacion) (TEC 123 Cartago)) (Personas (Id Nombre Apellido))) 'Insti 'TEC)
+;(add_Table'((Institucion (Nombre IdI Localizacion))) '(Persona IdP Nombre Apellido))
+;(searchReferenced '(((Reference_Table Reference_Column) Referenced_Table)((Car Owner) Person)) 'Car)
 ;(addReference entryList '(Mechanic Data Person))
 ;(referenced? (car entryList) 'Person)
 ;(refExist? (car entryList) 'Car 'Owner 'Person)
