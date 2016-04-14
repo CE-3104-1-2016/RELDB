@@ -1,0 +1,476 @@
+#lang racket
+(require math/number-theory)
+(define entryList '(((("Reference_Table" "Reference_Column") "Referenced_Table")
+                     (("Car" "Owner") "Person")(("table" "column") "originalTable"))
+                    ("Table_Name" ("Table_Format")("Table_Registers"))
+                    ("Person" ("ID" "Name" "Age") ("7115689" "Malcolm" "21") ("1468987" "Arturo" "22"))
+                    ("Car" ("Licence_Plate" "Owner" "Brand") ("648054" "7115689" "Nissan") ("ACS895" "1468987" "Audi"))
+                    ("Mechanic" ("ID" "Data" "Car"))
+                    ("Per1son" ("ID" "Nombre" "Age") ("7115689" "Malcolm" "21") ("1468987" "Arturo" "22"))))
+(define badEntry1 '(((("Reference_Table" "Reference_Column")() "Referenced_Table")
+                     (("Car" "Owner") "Person"()))()
+                                                  ("Table_Name" (Table_For()mat)(Table_Registers))
+                                                  ("Person" (ID Name Age)() (7()115689 Malcolm 21) (1468987 Arturo 22))
+                                                  ("Car" (Licence_Plate Own()er Brand) (648054 7115689 Nissan) (ACS895 1468987 Audi))
+                                                  ("Per1son" (ID Nombre Age) ()(7115689 Malcolm 21) ()(1468987 Arturo 22))))
+;Method to test if something is an atom 
+(define (atom? x)
+  (and (not (null? x))
+       (not (pair? x))))
+
+(define badEntry2 'a)
+
+;Method that handles the Queries
+(define (query DB userEntry)
+  (cond
+    [(null? userEntry) (display "Invalid Entry 1.") DB]
+    [(atom? userEntry) (display "Invalid Entry 2.") DB]
+    [(equal? (length userEntry) 1) (show (searchTable DB (car userEntry) 0)) DB]
+    [{and (string-contains? (cadr userEntry) "(")
+          (or (equal?  2  (length (cddr userEntry))) (equal?  0  (length (cddr userEntry))))
+          (not (null?  (searchTable DB (car userEntry) 0)))}
+     (show (cons (car userEntry) (cons (string-split (string-replace (string-replace (cadr userEntry) "(" "") ")" ""))
+                                 {queryAux (cddr (searchTable DB (car userEntry) 0))
+                                           (colToNum (cadr (searchTable DB (car userEntry) 0))
+                                                     (string-split (string-replace (string-replace (cadr userEntry) "(" "") ")" "")))
+                                           (colToNum  (cadr (searchTable DB (car userEntry) 0)) (cond
+                                                                                                  [(equal?  0  (length (cddr userEntry))) null]
+                                                                                                  [#t (caddr userEntry)]))})) )]
+    [#t (display "Invalid Entry. 3") DB]
+    )
+  )
+
+;Method that helps the query finding the table and the positions
+(define (searchTable DB name level)
+  (cond
+    [(equal? DB null) null]
+    [(atom? DB) null]
+    [(not (list? (car DB))) null]
+    [(equal? (caar DB) name) (car DB)]
+    [(not (equal? level 2)) (searchTable (cdr DB) name level)]
+    [#t null]
+    )
+  )
+
+;Auxiliar method to handle the queries
+(define (queryAux registers columNumbers condition)
+  (cond
+    [(contains? columNumbers -1) (display "The Query Column doesn't exist.") null]
+    [(atom? condition) (display "Invalid Condition Entry") null]
+    [(null? registers) null]
+    [(or (null? condition)(containsIn? (car registers) condition 0))
+     (cons (get (car registers) columNumbers 0) (queryAux (cdr registers) columNumbers condition))]
+    [(equal? (car condition) -1) (display "The Condidion Column doesn't exist.") null]
+    [#t (queryAux (cdr registers) columNumbers condition)]
+    )
+  )
+
+;Method that transforms the columns into numbers
+(define (colToNum columns columnNames)
+  (cond
+    [(null? columnNames) null]
+    [#t (cons (position columns (car columnNames) 0) (colToNum columns (cdr columnNames)))]
+    )
+  )
+
+
+;Method that gets the data from a column in a register
+(define (get register columNumbers actualNumber)
+  (cond
+    [(null? register) null]
+    [(contains? columNumbers actualNumber) (cons (car register) (get (cdr register) columNumbers (+ actualNumber 1)))]
+    [#t (get (cdr register) columNumbers (+ actualNumber 1))]
+    )
+  )
+
+;Method that checks if the register pass the condition 
+(define (containsIn? register condition actualColumn)
+  (cond
+    [(not(equal? (length condition) 2)) #f]
+    [(null? register) #f]
+    [(null? condition) #t]
+    [(and (atom? register) (not (equal? actualColumn (car condition))))#f]
+    [(and (equal? actualColumn (car condition)) (equal? (cadr condition) (car register))) #t]
+    [#t (containsIn? (cdr register) condition (+ 1 actualColumn))]
+    )
+  )
+
+
+
+;Method to add reference to the DB
+(define (addReference DB userEntry)
+  (cond
+    [(not (equal? (length userEntry) 3)) (display "The user entry is not valid.") DB]
+    [(equal? DB null) (display "The database is empty.") DB]
+    [(not (tableExist? DB (car userEntry))) ( display "The table doesn't exist.") DB]
+    [(not (empty? DB (car userEntry) 0)) ( display "The table isn't empty.") DB]
+    [(not (tableExist? DB (caddr userEntry))) (display "The source table doesn't exist.") DB]
+    [(not (columnExist? DB (car userEntry) (cadr userEntry) 0)) (display "The column doesn't exist.") DB]
+    [(reference? (car DB) (car userEntry)) (display "The table already have a reference") DB]
+    ;Other verifications
+    [#t (cons (cons (cons (cons (car userEntry) (cadr userEntry)) (caddr userEntry)) (car DB)) (cdr DB))]
+    )
+  )
+
+;Method that Formats and show the Database or the query in a user friendly manner
+(define (show DB)
+  (cond
+    [(null? DB) (display "")]
+    [(atom? DB) (display "")]
+    [(null? (car DB)) (display "")]
+    [(and (atom? (car DB)) (not (null? (cdr DB))) (list? (cadr DB))  (> (length (cadr DB)) 0))
+     (showAux  DB 0 #t (length (cadr DB)))(newline)(display (make-string 132 #\-))(newline)]
+    [(or(null? (car DB)) (null? (caar DB))) (display "")]
+    [(and (atom? (caar DB)) (not (null? (cdar DB))) (list? (cadar DB) ))
+     (showAux (car DB) 0 #t (length (cadar DB) ))(newline)(display (make-string 132 #\-))(newline) (show (cdr DB))]
+    [#t (show (cdr DB))]
+    )
+  )
+
+;Auxiliar method to show the table in a User Friendly manner
+(define (showAux table level change columns)
+  ;(newline)
+  ;(display "The table: ")
+  ;(display table)
+  ;(newline)
+  ;(display "The level: ")
+ ; (display level)
+  ;(newline)
+ ; (display "Does change? ")
+;  (display change)
+  ;(newline)
+ ; (display "The columns: ")
+;  (display columns)
+;  (newline)
+  (cond
+    [change (newline)(display (make-string 132 #\-))(newline)(showAux table level #f columns)]
+    [(null? table) (display "")]
+    [(atom? table) (display (format table (- (quotient  130  (* columns 2))(string-length table))))
+                   (cond [(equal? 1 columns)(newline)(display (make-string 132 #\-))(newline)]
+                         [#t (display "")]
+                         )]
+    [(equal? level 0) (display (format (car table) (quotient (- 130 (string-length (car table))) 2) ))
+                      (showAux (cdr table) (+ level 1) #t columns)]
+    [(and (equal? (with-modulus columns (mod (- level 1))) 0) (not (equal? 1 columns)))
+     (showAux (car table) (+ level 1) #t columns) (showAux (cdr table) level #f columns)]
+    [#t (showAux (car table) level #f columns) (showAux (cdr table) level #f columns)]
+    ))
+
+;Method that format a string to show it
+(define (format string space)
+  (cond [(> space 0) (string-append "|" (make-string space #\ ) string (make-string space #\ ) "|")]
+        [#t (string-append "|" (make-string 1 #\ ) string (make-string 1 #\ ) "|")])
+  )
+
+;Method to remove a reference from the Database
+(define (rmReference DB userEntry)
+  (cond
+    [(not (equal? (length userEntry) 3)) (display "The user entry is not valid.") DB]
+    [(equal? DB null) (display "The database is empty.") DB]
+    [(not (tableExist? DB (car userEntry))) ( display "The table doesn't exist.") DB]
+    [(not (empty? DB (car userEntry) 0)) ( display "The table isn't empty.") DB]
+    [(not (tableExist? DB (caddr userEntry)))( display "The source table doesn't exist.") DB]
+    [(not (columnExist? DB (car userEntry) (cadr userEntry) 0))( display "The column doesn't exist.") DB]
+    [(not (refExist? (car DB) (car userEntry) (cadr userEntry) (caddr userEntry))) ( display "The reference doesn't exist.") DB]
+    ;Other verifications
+    [#t (rmRefAux (car DB) (car userEntry) (cadr userEntry) (caddr userEntry))]
+    )
+  )
+
+
+;Method that updates the records of the DB
+(define (update DB userEntry)
+  (cond
+    [(null? DB) (display "The Database is empty.") DB]
+    [(atom? userEntry) (display "Not valid entry") DB]
+    [(or(not (equal? (with-modulus 2(mod (length userEntry))) 0)) (not (>= (length userEntry) 4))) (display "Invalid entry.") DB]
+    [(not (tableExist? DB (car userEntry)))  (display "The table doesn't exist.") DB]
+    [(not (registerExist? DB (car userEntry) (cadr userEntry))) (display "The Primary key doesn't exist.")]
+    [#t (updateAux DB (car userEntry) (cadr userEntry) (cddr userEntry))]
+    )
+  )
+
+;Auxiliar method to update the Database records
+(define (updateAux DB tableName PK userEntry)
+  (cond
+    [(null? DB) DB]
+    [(atom? DB) DB]
+    [(null? (car DB)) DB]
+    [(atom? (car DB)) DB]
+    [(not (equal? (caar DB) tableName)) (cons (car DB) (updateAux (cdr DB) tableName PK userEntry) )]
+    [#t (cons(append (append
+                      (cons (caar DB) '())
+                      (cons(cadar DB) '()))
+                     (updateAuxAux (cddar DB) (cadar DB) PK userEntry)) (cdr DB))]
+    )
+  )
+
+;Recursion auxiliar method to update the Database records
+(define (updateAuxAux table columns PK userEntry)
+  (cond
+    [(null? userEntry) table]
+    [(not (>= (length userEntry) 2)) table]
+    [(null? table) table]
+    [(atom? table)table]
+    [(null? (car table))table]
+    [(atom? (car table)) table]
+    [(not (contains? columns (car userEntry))) (display "The column doesn't exist.") table]
+    [(not (equal? (caar table) PK))(cons (car table)(updateAuxAux (cdr table) columns PK userEntry))]
+    [(equal? (position columns (car userEntry) 0) 0 ) (display "The Primary Key cannot be changed.") table] 
+    [#t (updateAuxAux (cons (
+                             replace (car table) (cadr userEntry) 0 (position columns (car userEntry) 0))
+                            (cdr table))
+                      columns PK (cddr userEntry))]
+    )
+  )
+
+;Method that replace a value on the list
+(define (replace list value actualPos pos)
+  (cond
+    [(null? list) list]
+    [(and (not (atom? list)) (not (equal? actualPos pos))) (cons (car list) (replace (cdr list) value (+ actualPos 1) pos))]
+    [(equal? actualPos pos ) (cons value (cdr list))]
+    [#t list]
+    ))
+
+;Method that returns a representation of the position of the column with a int
+(define (position columns name pos)
+  (cond
+    [(or (atom? columns)(null? columns)) -1]
+    [(equal? (car columns) name) pos]
+    [#t (position (cdr columns) name (+ 1 pos))]
+    ))
+
+;Auxiliar method of the rmReference method
+(define (rmRefAux references table column sourceTable)
+  (cond
+    [(atom? references) null]
+    [(null? references) null]
+    [(atom? (car references)) null]
+    [(null? (car references)) null]
+    [(atom? (cdr references)) null]
+    [(equal? (caaar references) table) (rmRefAux (cdr references) table column sourceTable)]
+    [#t (cons(car references) (rmRefAux (cdr references) table column sourceTable) )]
+    )
+  )
+
+
+;Method that checks if a reference exist
+(define (refExist? references table column sourceTable)
+  (cond
+    [(atom? references) #f]
+    [(null? references) #f]
+    [(atom? (car references)) #f]
+    [(null? (car references)) #f]
+    [(atom? (cdr references)) #f]
+    [(atom? (cdar references)) #f]
+    [(null? (cdar references)) #f]
+    [(and (equal? (caar references) table)(equal? (cadar references) column)(equal? (cadr references) sourceTable)) #t]
+    [#t (or (refExist? (car references) table column sourceTable)(refExist? (cdr references) table column sourceTable))]
+    )
+  )
+
+
+;Method that checks if a table has been referenced
+(define (referenced? references sourceTable)
+  (searchAux references sourceTable 0 2)
+  )
+
+;Method that checks if a table has been referenced
+(define (reference? references sourceTable)
+  (searchAux references sourceTable 0 3)
+  )
+
+;Method that checks if the table exist
+(define (tableExist? DB tableName)
+  (searchAux DB tableName 0 2)
+  )
+
+;********************************************************************************
+;Search if a element exist on the list
+(define (searchAux list name actualLevel searchLevel)
+  (cond
+    [(null? list) #f]
+    [(and (not (equal? actualLevel searchLevel))(not (atom? list))) (or
+                                                                     (searchAux (car list) name (+ actualLevel 1) searchLevel)
+                                                                     (searchAux (cdr list) name actualLevel searchLevel))]
+    
+    [(equal? actualLevel searchLevel) (equal? list name)]
+    [#t #f])
+  )
+
+;Method that checks if the table is empty
+(define (empty? DB tableName level)
+  (cond
+    [(equal? DB null) #f]
+    [(atom? DB) #f]
+    [(equal? (car DB) tableName) (cond
+                                   {(null? (cdr DB)) #f}
+                                   {(atom? (cdr DB)) #f}
+                                   {#t (< (length (cdr DB)) 2)})]
+    [(not (equal? level 2)) (or (empty? (car DB) tableName  (+ level 1)) (empty? (cdr DB) tableName  level))]
+    [#t #f]
+    ))
+
+;Method that checks if the column exist
+(define (columnExist? DB tableName columnName level)
+  (cond
+    [(equal? DB null) #f]
+    [(atom? DB) #f]
+    [(equal? (car DB) tableName) (cond
+                                   {(null? (cdr DB)) #f}
+                                   {(atom? (cdr DB)) #f}
+                                   {(not (null? (cadr DB)))(contains? (cadr DB) columnName)}
+                                   {#t #f})]
+    [(not (equal? level 2)) (or (columnExist? (car DB) tableName columnName (+ level 1)) (columnExist? (cdr DB) tableName columnName level))]
+    [#t #f]
+    ))
+
+;Method that check if an element is in the list
+(define (contains? list word)
+  (cond
+    [(equal? list null) #f]
+    [(atom? list) (equal? word list)]
+    [#t (or 
+         (contains? (car list) word) 
+         (contains? (cdr list) word))]))
+
+
+
+;Method that read the user entry
+(define (readBox)
+  (regexp-split #rx"(( +\"?)|(\"? +)|)" (read-line
+                                         (current-input-port)))
+  )
+
+
+
+;(addReference entryList '(Mechanic Data Person))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (init DB)
+  (add_Table DB ) )
+
+
+
+
+;Method that add new tables to DB
+(define (add_Table DB userEntry)
+  (cond
+    [(not(tableExist? DB (car userEntry)))(append DB (list(cons (car userEntry) (list(cdr userEntry)))))]
+    [#t (display "Table already exist, use the command insert, to insert registers in the table")]
+    ))
+
+;Method that manage the register insertions
+(define (mngIns DB tableName data)
+  (cond
+    [(and (not(equal? data null)) (not(tableExist? DB tableName)))
+     (cond
+       [(not(reference? DB tableName))
+        (cond
+          [(list? (car data)) (insert_data_by_Parameter DB tableName data)]
+          [(atom? (car data)) (insert_data DB tableName data)]
+          [#t (display "Not valid entries")])]
+       [(reference? (car DB) tableName)
+        (cond
+          [((registerExist? DB (searchReferenced (car DB) tableName) (car data))) refExist? (car DB)])])]) 
+  [#t (display "Table doesn't exist or syntax of given records were incorrect" )]
+  )
+;Method that inserts registers by paramters
+(define(insert_data_by_Parameter DB tableName data)
+  DB)
+
+;Method that inserts data in the table, if the table exist
+(define (insert_data DB tableName data)
+  (cond
+    [(not(equal? DB null))
+     (cond
+       [(atom? (car DB))
+        (cond
+          [(equal? (car DB) tableName) (auxIns DB tableName data)]
+          [(not(equal? (car DB) tableName)) DB]
+          )]
+       [#t(cons (insert_data (car DB) tableName data) (insert_data (cdr DB) tableName data))]
+       )]
+    [#t DB])
+  ) 
+
+;auxiliar function for insert registers
+(define (auxIns DB tableName data)
+  (display data)
+  (display (car(cdr DB)))
+  (newline)
+  (cond
+    [(equal? (length (car (cdr DB))) (length data)) (cons (car DB) (append (cdr DB) (list data)))]
+    [(> (length (car (cdr DB))) (length data)) (auxIns DB tableName (append data (list 'nil)))]
+    [(< (length (car (cdr DB))) (length data)) (display "Imposible to insert registers, more registers than necessary, please verify")]))
+
+
+;Method that check if a register is in a table
+(define (registerExist? DB tableName regName)
+  (cond
+    [(equal? DB null) #f]
+    [(equal? (caar DB) tableName) (cond
+                                    [(containsReg? (caar (cddr (car DB))) regName) #t]
+                                    [(registerExist? (cdr DB) tableName regName)]
+                                    [#t #f])]
+    [(registerExist? (cdr DB) tableName regName)]
+    [#t #f]
+    ))
+
+;Auxiliar for search registers in a table
+(define (containsReg? pKey regName)
+  (cond
+    [(equal? pKey regName) #t]
+    [#t #f]
+    ))
+
+;Method that search the PK in the referenced table
+(define (searchReferenced references tableName)
+  (cond
+    [(atom? references) null]
+    [(null? references) null]
+    [(atom? (car references)) null (display "1")]
+    [(null? (car references)) null (display "2")]
+    [(atom? (cdr references)) null (display "3")]
+    ;[(null? (cdr references)) null (display "4")]
+    [(equal? (caaar references) tableName) (car(cdr(car references)))]
+    [#t (searchReferenced (cdr references) tableName)]
+    ))
+
+
+
+;(showAux '("Person" ("ID" "Name" "Age") ("7115689" "Malcolm" "21") ("1468987" "Arturo" "22")) 0 #t 3)  
+;(showAux '("Person" ("ID" "Name" "Age" "Number") ("7115689" "Malcolm" "21" "89606264")("1468987" "Arturo" "22" "70181989")) 0 #t 4)
+;(show entryList)
+;(show (caddr entryList))
+;(insert_data '((Insti (Nombre IdI Localizacion))(Personas(Id Nombre Apellido))) 'Insti '(TEC 123 Cartago))
+;(registerExist? '((Insti (Nombre IdI Localizacion) (TEC 123 Cartago)) (Personas (Id Nombre Apellido))) 'Insti 'TEC)
+;(add_Table'((Institucion (Nombre IdI Localizacion))) '(Persona IdP Nombre Apellido))
+;(searchReferenced '(((Reference_Table Reference_Column) Referenced_Table)((Car Owner) Person)) 'Car)
+;(addReference entryList '(Mechanic Data Person))
+;(referenced? (car entryList) 'Person)
+;(refExist? (car entryList) 'Car 'Owner 'Person)
+;(rmRefAux (car entryList) 'table 'column 'originalTable)
+;(update entryList '(Car 648054 Brand Audi Owner Pene))
+;(update entryList '(Car 648054 Brand Audi))
+;(searchTable entryList "Person" 0)
+;(query entryList '("Car"))
+
+(query entryList '("Person" "(Owner Brand)" "Age" "21"))
