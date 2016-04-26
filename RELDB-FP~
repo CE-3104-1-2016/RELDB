@@ -1,0 +1,14 @@
+#lang racket
+(define entryList '((((Reference_Table Reference_Column) Referenced_Table)
+((Car Owner) Person))
+(Table_Name (Table_Format)(Table_Registers))
+(Person (ID Nombre Age) (7115689 Malcolm 21) (1468987 Arturo 22))
+(Car (Licence_Plate Owner Brand) (648054 7115689 Nissan) (ACS895 1468987 Audi))))
+;Method to add reference to the DB
+(define (addReference pList)
+  (cond
+    [(eq? pList null) write "The Database is empty"]
+    [(eq? 'true 'true) write "GG"]
+    )
+  )
+  
